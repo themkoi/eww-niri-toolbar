@@ -4,7 +4,7 @@ A rust binary that outputs app information from niri-ipc to be consumed by eww.
 
 ## Example widget
 ```clojure
-(deflisten wlr_apps :initial "[]" "$PATH_TO_BINARY/eww-niri-taskbar")
+(deflisten taskbar :initial "[]" "/mnt/data/git/eww-niri-toolbar/target/release/eww-niri-taskbar")
 
 (defwidget taskbar []
   (box
@@ -12,7 +12,7 @@ A rust binary that outputs app information from niri-ipc to be consumed by eww.
     :space-evenly false
     :spacing 10
     :class "taskbar"
-    (for ws in {wlr_apps.workspaces}
+    (for ws in {taskbar.workspaces}
       (box
         :orientation "h"
         :class "workspace"
