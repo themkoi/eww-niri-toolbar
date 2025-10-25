@@ -41,14 +41,28 @@ impl SerializableState {
                 .find();
 
             let mut icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+            let lowercase_icon_name = icon_name.to_lowercase();
             if icon_path.is_empty() {
-                let lowercase_icon_name = icon_name.to_lowercase();
                 icon = lookup(&lowercase_icon_name)
                     .with_size(*icon_size)
                     .with_cache()
                     .with_theme(&icon_theme)
                     .find();
 
+                icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+            }
+
+            if icon_path.is_empty() {
+                let icon_name = lowercase_icon_name
+                    .rsplit('.')
+                    .next()
+                    .unwrap_or("application-default-icon");
+
+                icon = lookup(icon_name)
+                    .with_cache()
+                    .with_size(*icon_size)
+                    .with_theme(&icon_theme)
+                    .find();
                 icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
             }
 
@@ -90,7 +104,7 @@ impl SerializableState {
 
         for ws in &mut workspaces {
             match sorting_mode {
-                SortingMode::Default => {} 
+                SortingMode::Default => {}
                 SortingMode::AZ => ws.windows.sort_by(|a, b| a.app_id.cmp(&b.app_id)),
                 SortingMode::Id => ws.windows.sort_by_key(|w| w.id),
             }

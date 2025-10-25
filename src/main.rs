@@ -1,11 +1,6 @@
-use niri_ipc::{socket::Socket, Event, Reply, Request, Response, Window, Workspace};
-use std::io;
-
-use crate::config::SortingMode;
+use niri_ipc::{socket::Socket, Event, Request, Response, Window};
 
 mod serializable;
-
-mod niri_socket;
 
 mod config;
 
@@ -20,12 +15,18 @@ fn main() {
     };
     let reply = socket.send(Request::EventStream).unwrap();
     if matches!(reply, Ok(Response::Handled)) {
-        let response = socket.send(Request::Windows);
         let mut read_event = socket.read_events(); // ownership moves here
         while let Ok(event) = read_event() {
             state.update_with_event(event);
-            let serializable_state = serializable::SerializableState::from_parts(&state,&config.general.icon_size,&config.general.icon_theme,&config.general.seperate_workspaces,&config.general.sorting_mode);
+            let serializable_state = serializable::SerializableState::from_parts(
+                &state,
+                &config.general.icon_size,
+                &config.general.icon_theme,
+                &config.general.seperate_workspaces,
+                &config.general.sorting_mode,
+            );
             let json = serde_json::to_string(&serializable_state).unwrap();
+
             println!("{}", json);
         }
     }
@@ -48,44 +49,34 @@ impl State {
             Event::WorkspaceActivated { .. } => {}
             Event::WorkspaceActiveWindowChanged { .. } => {}
             Event::WindowsChanged { windows } => self.windows = windows,
-            Event::WindowOpenedOrChanged { .. } => {
-                let niri_socket = niri_socket::NiriSocket::new();
-
-                let mut niri_socket = match niri_socket {
-                    Some(socket) => socket,
-                    None => {
-                        eprintln!("Failed to connect with Niri instance");
-                        return;
+            Event::WindowOpenedOrChanged { window } => {
+                if window.is_focused {
+                    // All other windows become not focused
+                    for window in self.windows.iter_mut() {
+                        window.is_focused = false;
                     }
-                };
-                let windows = niri_socket.list_windows();
-                self.windows = windows;
+                }
+
+                // Change or add window
+                if let Some(w) = self.windows.iter_mut().find(|w| w.id == window.id) {
+                    *w = window;
+                } else {
+                    self.windows.push(window);
+                }
             }
-            Event::WindowClosed { .. } => {
-                let niri_socket = niri_socket::NiriSocket::new();
-
-                let mut niri_socket = match niri_socket {
-                    Some(socket) => socket,
-                    None => {
-                        eprintln!("Failed to connect with Niri instance");
-                        return;
-                    }
-                };
-                let windows = niri_socket.list_windows();
-                self.windows = windows;
+            Event::WindowClosed { id } => {
+                self.windows.retain(|w| w.id != id);
             }
-            Event::WindowFocusChanged { .. } => {
-                let niri_socket = niri_socket::NiriSocket::new();
+            Event::WindowFocusChanged { id } => {
+                for window in self.windows.iter_mut() {
+                    window.is_focused = false;
+                }
 
-                let mut niri_socket = match niri_socket {
-                    Some(socket) => socket,
-                    None => {
-                        eprintln!("Failed to connect with Niri instance");
-                        return;
+                if let Some(id) = id {
+                    if let Some(window) = self.windows.iter_mut().find(|w| w.id == id) {
+                        window.is_focused = true;
                     }
-                };
-                let windows = niri_socket.list_windows();
-                self.windows = windows;
+                }
             }
             Event::WindowLayoutsChanged { .. } => {}
             Event::KeyboardLayoutsChanged { .. } => { /* Do nothing */ }
