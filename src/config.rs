@@ -27,8 +27,8 @@ pub struct Config {
 fn default_config() -> Config {
     Config {
         general: GeneralConfig {
-            icon_theme: "Papirus-Dark".to_string(),
-            icon_size: 48,
+            icon_theme: "Papirus".to_string(),
+            icon_size: 16,
             seperate_workspaces: true,
             sorting_mode: SortingMode::Default,
         }
