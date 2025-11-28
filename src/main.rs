@@ -13,9 +13,11 @@ fn main() {
     } else {
         Socket::connect().unwrap()
     };
+
     let reply = socket.send(Request::EventStream).unwrap();
     if matches!(reply, Ok(Response::Handled)) {
-        let mut read_event = socket.read_events(); // ownership moves here
+        let mut read_event = socket.read_events();
+
         while let Ok(event) = read_event() {
             state.update_with_event(event);
             let serializable_state = serializable::SerializableState::from_parts(
@@ -25,12 +27,17 @@ fn main() {
                 &config.general.seperate_workspaces,
                 &config.general.sorting_mode,
             );
-            let json = serde_json::to_string(&serializable_state).unwrap();
 
-            println!("{}", json);
+            if !serializable_state.workspaces.is_empty() {
+                let json = serde_json::to_string(&serializable_state).unwrap();
+                println!("{}", json);
+            }
         }
     }
 }
+
+
+
 
 #[derive(Debug, Default)]
 struct State {

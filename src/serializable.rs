@@ -4,11 +4,11 @@ use serde::Serialize;
 
 #[derive(Serialize)]
 pub(crate) struct SerializableState {
-    workspaces: Vec<Workspace>,
+    pub(crate) workspaces: Vec<Workspace>,
 }
 
 #[derive(Serialize)]
-struct Workspace {
+pub struct Workspace {
     id: u64,
     windows: Vec<Window>,
 }
