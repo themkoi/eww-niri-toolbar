@@ -67,6 +67,20 @@ impl SerializableState {
             }
 
             if icon_path.is_empty() {
+                let icon_name = lowercase_icon_name
+                    .split('*')
+                    .next()
+                    .unwrap_or("application-default-icon");
+
+                icon = lookup(icon_name)
+                    .with_size(*icon_size)
+                    .with_cache()
+                    .with_theme(&icon_theme)
+                    .find();
+                icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+            }
+
+            if icon_path.is_empty() {
                 icon = lookup("application-x-executable")
                     .with_size(*icon_size)
                     .with_cache()
