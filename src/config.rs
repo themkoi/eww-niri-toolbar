@@ -50,19 +50,32 @@ fn write_config<P: AsRef<Path>>(path: P, config: &Config) -> std::io::Result<()>
     fs::write(path, toml_string)
 }
 
-pub fn load_or_create_config() -> Result<Config, Box<dyn std::error::Error>> {
-    let path_bug = get_config_file();
-    let path = &path_bug;
+pub fn load_or_create_config() -> Config {
+    let path = get_config_file();
+
     if !path.exists() {
         let default = default_config();
-        write_config(path, &default)?;
-        return Ok(default);
+        let _ = write_config(&path, &default);
+        return default;
     }
 
     let loaded = ConfigLoader::builder()
         .add_source(File::with_name(path.to_str().unwrap()))
-        .build()?
-        .try_deserialize::<Config>()?;
+        .build();
 
-    Ok(loaded)
+    match loaded {
+        Ok(cfg) => match cfg.try_deserialize::<Config>() {
+            Ok(conf) => conf,
+            Err(_) => {
+                let default = default_config();
+                let _ = write_config(&path, &default);
+                default
+            }
+        },
+        Err(_) => {
+            let default = default_config();
+            let _ = write_config(&path, &default);
+            default
+        }
+    }
 }
