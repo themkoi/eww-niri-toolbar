@@ -1,3 +1,4 @@
+use crate::cache::*;
 use crate::{config::SortingMode, State};
 use freedesktop_icons::lookup;
 use serde::Serialize;
@@ -29,64 +30,76 @@ impl SerializableState {
         icon_theme: &String,
         seperate_workspaces: &bool,
         sorting_mode: &SortingMode,
+        icon_cache: &mut CacheMap,
     ) -> Self {
         let mut workspaces_map = std::collections::BTreeMap::<u64, Workspace>::new();
 
         for win in &state.windows {
             let icon_name = win.app_id.as_deref().unwrap_or("application-default-icon");
-            let mut icon = lookup(icon_name)
-                .with_cache()
-                .with_size(*icon_size)
-                .with_theme(&icon_theme)
-                .find();
-
-            let mut icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-            let lowercase_icon_name = icon_name.to_lowercase();
-            if icon_path.is_empty() {
-                icon = lookup(&lowercase_icon_name)
-                    .with_size(*icon_size)
-                    .with_cache()
-                    .with_theme(&icon_theme)
-                    .find();
-
-                icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-            }
-
-            if icon_path.is_empty() {
-                let icon_name = lowercase_icon_name
-                    .rsplit('.')
-                    .next()
-                    .unwrap_or("application-default-icon");
-
-                icon = lookup(icon_name)
+            let mut icon_path: String;
+            if let Some(cache_date) = icon_cache.get(win.app_id.as_deref().unwrap_or("application-default-icon")) {
+                icon_path = cache_date.icon_path.clone();
+            } else {
+                let mut icon = lookup(icon_name)
                     .with_cache()
                     .with_size(*icon_size)
                     .with_theme(&icon_theme)
                     .find();
-                icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-            }
 
-            if icon_path.is_empty() {
-                let icon_name = lowercase_icon_name
-                    .split('*')
-                    .next()
-                    .unwrap_or("application-default-icon");
-
-                icon = lookup(icon_name)
-                    .with_size(*icon_size)
-                    .with_cache()
-                    .with_theme(&icon_theme)
-                    .find();
                 icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-            }
+                let lowercase_icon_name = icon_name.to_lowercase();
+                if icon_path.is_empty() {
+                    icon = lookup(&lowercase_icon_name)
+                        .with_size(*icon_size)
+                        .with_cache()
+                        .with_theme(&icon_theme)
+                        .find();
 
-            if icon_path.is_empty() {
-                icon = lookup("application-x-executable")
-                    .with_size(*icon_size)
-                    .with_cache()
-                    .with_theme(&icon_theme)
-                    .find();
-                icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                }
+
+                if icon_path.is_empty() {
+                    let icon_name = lowercase_icon_name
+                        .rsplit('.')
+                        .next()
+                        .unwrap_or("application-default-icon");
+
+                    icon = lookup(icon_name)
+                        .with_cache()
+                        .with_size(*icon_size)
+                        .with_theme(&icon_theme)
+                        .find();
+                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                }
+
+                if icon_path.is_empty() {
+                    let icon_name = lowercase_icon_name
+                        .split('*')
+                        .next()
+                        .unwrap_or("application-default-icon");
+
+                    icon = lookup(icon_name)
+                        .with_size(*icon_size)
+                        .with_cache()
+                        .with_theme(&icon_theme)
+                        .find();
+                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                }
+
+                if icon_path.is_empty() {
+                    icon = lookup("application-x-executable")
+                        .with_size(*icon_size)
+                        .with_cache()
+                        .with_theme(&icon_theme)
+                        .find();
+                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                }
+
+                set_path(
+                    icon_cache,
+                    win.app_id.as_deref().unwrap_or("application-default-icon"),
+                    &icon_path,
+                );
             }
 
             let window = Window {
@@ -123,7 +136,7 @@ impl SerializableState {
                 SortingMode::Id => ws.windows.sort_by_key(|w| w.id),
             }
         }
-
+        save_history(&icon_cache);
         SerializableState { workspaces }
     }
 }

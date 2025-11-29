@@ -4,8 +4,11 @@ mod serializable;
 
 mod config;
 
+mod cache;
+
 fn main() {
     let config = config::load_or_create_config().unwrap();
+    let mut history = cache::load_history();
     let mut state = State::new();
     let niri_socket_env = std::env::var("NIRI_SOCKET");
     let mut socket = if let Ok(niri_socket) = niri_socket_env {
@@ -26,6 +29,7 @@ fn main() {
                 &config.general.icon_theme,
                 &config.general.seperate_workspaces,
                 &config.general.sorting_mode,
+                &mut history
             );
 
             if !serializable_state.workspaces.is_empty() {
