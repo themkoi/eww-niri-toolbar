@@ -16,6 +16,8 @@ dirs = "5"
 config = "0.15.11"
 icon = "0.2.0"
 image = "0.25.9"
+env_logger = "0.11.8"
+log = "0.4.28"
 
 [profile.release]
 lto = "fat"

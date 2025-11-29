@@ -8,6 +8,7 @@ use freedesktop_icons::lookup;
 use icon::Icons;
 use image::imageops::FilterType;
 use image::{DynamicImage, GenericImageView, RgbaImage};
+use log::debug;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -36,6 +37,7 @@ fn resize_icon_if_needed(
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let img = image::open(input_icon)?;
     let (width, height) = img.dimensions();
+    debug!("resizing image: {}", input_icon.to_string_lossy().to_string());
 
     if width != target_size || height != target_size {
         let rgba: RgbaImage = img.to_rgba8();
@@ -64,15 +66,12 @@ pub fn get_icon_desktop_fallback(
     icon_theme: &str,
     icon_size: u16,
 ) -> Option<String> {
-    println!(" what");
     let locales = get_languages_from_env();
     let paths = Iter::new(default_paths());
-    println!(" ste");
-
+    debug!(" searching through files");
     for path in paths {
         if let Ok(entry) = DesktopEntry::from_path(path, Some(&locales)) {
             if let Some(name) = entry.name(&locales) {
-                println!(" searching desktop");
                 if name == app_name {
                     // Try to get the icon from the .desktop file
                     let icon_name = entry.icon().unwrap_or_default();
@@ -121,6 +120,7 @@ impl SerializableState {
                 icon_cache.get(win.app_id.as_deref().unwrap_or("application-default-icon"))
             {
                 icon_path = cache_date.icon_path.clone();
+                debug!("got icon from cache: {}",icon_path);
 
                 if *check_cache_validity && Path::new(&cache_date.icon_path).exists() {
                     run_lookup = false; // cache is valid, no need to run lookup
@@ -128,6 +128,7 @@ impl SerializableState {
             }
 
             if run_lookup {
+                debug!("running lookup for {}", icon_name);
                 let mut icon = lookup(icon_name)
                     .with_cache()
                     .with_size(*icon_size)

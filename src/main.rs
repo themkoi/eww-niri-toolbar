@@ -7,6 +7,7 @@ mod config;
 mod cache;
 
 fn main() {
+    env_logger::init();
     let config = config::load_or_create_config();
     let mut history = cache::load_cache();
     let mut state = State::new();
