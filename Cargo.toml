@@ -10,9 +10,11 @@ serde = "1.0"
 serde_json = "1.0"
 eyre = "0.6"
 freedesktop-icons = "0.3.1"
+freedesktop-desktop-entry = "=0.7.11"
 toml = "0.8"
 dirs = "5"
 config = "0.15.11"
+icon = "0.2.0"
 
 [profile.release]
 lto = "fat"

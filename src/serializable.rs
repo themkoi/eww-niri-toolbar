@@ -2,7 +2,9 @@ use std::path::Path;
 
 use crate::cache::*;
 use crate::{config::SortingMode, State};
+use freedesktop_desktop_entry::{default_paths, get_languages_from_env, DesktopEntry, Iter};
 use freedesktop_icons::lookup;
+use icon::Icons;
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -23,6 +25,47 @@ struct Window {
     title: String,
     icon_path: String,
     is_focused: bool,
+}
+
+pub fn get_icon_desktop_fallback(
+    app_name: &str,
+    icon_theme: &str,
+    icon_size: u16,
+) -> Option<String> {
+    println!(" what");
+    let locales = get_languages_from_env();
+    let paths = Iter::new(default_paths());
+    println!(" ste");
+
+    for path in paths {
+        if let Ok(entry) = DesktopEntry::from_path(path, Some(&locales)) {
+            if let Some(name) = entry.name(&locales) {
+                println!(" searching desktop");
+                if name == app_name {
+                    // Try to get the icon from the .desktop file
+                    let icon_name = entry.icon().unwrap_or_default();
+                    let mut icon_p = lookup(icon_name)
+                        .with_theme(icon_theme)
+                        .with_size(icon_size)
+                        .with_cache()
+                        .find();
+
+                    if icon_p.is_none() {
+                        let icons = Icons::new();
+                        icons.find_standalone_icon(icon_name).map(|icon| {
+                            icon_p = Some(icon.path().to_path_buf());
+                        });
+                    }
+
+                    if let Some(icon_path) = icon_p {
+                        return Some(icon_path.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    None
 }
 
 impl SerializableState {
@@ -100,6 +143,18 @@ impl SerializableState {
                         .find();
 
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                }
+
+                if icon_path.is_empty() {
+                    let icons = Icons::new();
+                    icons.find_standalone_icon(icon_name).map(|icon| {
+                        icon_path = icon.path().to_string_lossy().to_string();
+                    });
+                }
+
+                if icon_path.is_empty() {
+                    icon_path =
+                        get_icon_desktop_fallback(icon_name, &*icon_theme, *icon_size).unwrap_or_default();
                 }
 
                 if icon_path.is_empty() {
