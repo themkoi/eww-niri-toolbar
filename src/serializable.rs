@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use crate::cache::*;
 use crate::{config::SortingMode, State};
 use freedesktop_icons::lookup;
@@ -31,15 +33,26 @@ impl SerializableState {
         seperate_workspaces: &bool,
         sorting_mode: &SortingMode,
         icon_cache: &mut CacheMap,
+        check_cache_validity: &bool,
     ) -> Self {
         let mut workspaces_map = std::collections::BTreeMap::<u64, Workspace>::new();
         let mut cache_changed = false;
         for win in &state.windows {
             let icon_name = win.app_id.as_deref().unwrap_or("application-default-icon");
-            let mut icon_path: String;
-            if let Some(cache_date) = icon_cache.get(win.app_id.as_deref().unwrap_or("application-default-icon")) {
+            let mut icon_path = String::new();
+            let mut run_lookup = true;
+
+            if let Some(cache_date) =
+                icon_cache.get(win.app_id.as_deref().unwrap_or("application-default-icon"))
+            {
                 icon_path = cache_date.icon_path.clone();
-            } else {
+
+                if *check_cache_validity && Path::new(&cache_date.icon_path).exists() {
+                    run_lookup = false; // cache is valid, no need to run lookup
+                }
+            }
+
+            if run_lookup {
                 let mut icon = lookup(icon_name)
                     .with_cache()
                     .with_size(*icon_size)
@@ -48,6 +61,7 @@ impl SerializableState {
 
                 icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
                 let lowercase_icon_name = icon_name.to_lowercase();
+
                 if icon_path.is_empty() {
                     icon = lookup(&lowercase_icon_name)
                         .with_size(*icon_size)
@@ -69,6 +83,7 @@ impl SerializableState {
                         .with_size(*icon_size)
                         .with_theme(&icon_theme)
                         .find();
+
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
                 }
 
@@ -83,6 +98,7 @@ impl SerializableState {
                         .with_cache()
                         .with_theme(&icon_theme)
                         .find();
+
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
                 }
 
@@ -92,6 +108,7 @@ impl SerializableState {
                         .with_cache()
                         .with_theme(&icon_theme)
                         .find();
+
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
                 }
 
@@ -100,7 +117,8 @@ impl SerializableState {
                     win.app_id.as_deref().unwrap_or("application-default-icon"),
                     &icon_path,
                 );
-                cache_changed = true
+
+                cache_changed = true;
             }
 
             let window = Window {

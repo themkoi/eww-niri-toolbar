@@ -29,7 +29,8 @@ fn main() {
                 &config.general.icon_theme,
                 &config.general.seperate_workspaces,
                 &config.general.sorting_mode,
-                &mut history
+                &mut history,
+                &config.general.check_cache_validity
             );
 
             if !serializable_state.workspaces.is_empty() {

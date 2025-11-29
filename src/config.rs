@@ -17,6 +17,7 @@ pub struct GeneralConfig {
     pub icon_size: u16,
     pub seperate_workspaces: bool,
     pub sorting_mode: SortingMode,
+    pub check_cache_validity: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -31,6 +32,7 @@ fn default_config() -> Config {
             icon_size: 16,
             seperate_workspaces: true,
             sorting_mode: SortingMode::Default,
+            check_cache_validity: true,
         }
     }
 }
