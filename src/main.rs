@@ -8,7 +8,7 @@ mod cache;
 
 fn main() {
     let config = config::load_or_create_config().unwrap();
-    let mut history = cache::load_history();
+    let mut history = cache::load_cache();
     let mut state = State::new();
     let niri_socket_env = std::env::var("NIRI_SOCKET");
     let mut socket = if let Ok(niri_socket) = niri_socket_env {

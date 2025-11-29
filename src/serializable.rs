@@ -33,7 +33,7 @@ impl SerializableState {
         icon_cache: &mut CacheMap,
     ) -> Self {
         let mut workspaces_map = std::collections::BTreeMap::<u64, Workspace>::new();
-
+        let mut cache_changed = false;
         for win in &state.windows {
             let icon_name = win.app_id.as_deref().unwrap_or("application-default-icon");
             let mut icon_path: String;
@@ -100,6 +100,7 @@ impl SerializableState {
                     win.app_id.as_deref().unwrap_or("application-default-icon"),
                     &icon_path,
                 );
+                cache_changed = true
             }
 
             let window = Window {
@@ -136,7 +137,9 @@ impl SerializableState {
                 SortingMode::Id => ws.windows.sort_by_key(|w| w.id),
             }
         }
-        save_history(&icon_cache);
+        if cache_changed {
+            save_cache(&icon_cache);
+        }
         SerializableState { workspaces }
     }
 }

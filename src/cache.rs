@@ -17,7 +17,7 @@ pub fn get_cache_file() -> PathBuf {
     path
 }
 
-pub fn load_history() -> CacheMap {
+pub fn load_cache() -> CacheMap {
     let path = get_cache_file();
     if let Ok(data) = fs::read_to_string(&path) {
         toml::from_str(&data).unwrap_or_default()
@@ -26,12 +26,16 @@ pub fn load_history() -> CacheMap {
     }
 }
 
-pub fn save_history(history: &CacheMap) {
+pub fn save_cache(history: &CacheMap) {
     let toml_str = toml::to_string(history).unwrap();
     fs::write(get_cache_file(), toml_str).unwrap();
 }
 
-pub fn set_path(history: &mut CacheMap, appid: &str, icon_path: &str) {
+pub fn set_path(history: &mut CacheMap, appid: &str, icon_path: &str) -> bool {
     let entry = history.entry(appid.to_string()).or_default();
+    if entry.icon_path == icon_path {
+        return false;
+    }
     entry.icon_path = icon_path.to_string();
+    true
 }
