@@ -1,10 +1,13 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use crate::cache::*;
 use crate::{config::SortingMode, State};
 use freedesktop_desktop_entry::{default_paths, get_languages_from_env, DesktopEntry, Iter};
 use freedesktop_icons::lookup;
 use icon::Icons;
+use image::imageops::FilterType;
+use image::{DynamicImage, GenericImageView, RgbaImage};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -25,6 +28,35 @@ struct Window {
     title: String,
     icon_path: String,
     is_focused: bool,
+}
+fn resize_icon_if_needed(
+    input_icon: &Path,
+    target_size: u32,
+    output_path: &Path,
+) -> Result<bool, Box<dyn std::error::Error>> {
+    let img = image::open(input_icon)?;
+    let (width, height) = img.dimensions();
+
+    if width != target_size || height != target_size {
+        let rgba: RgbaImage = img.to_rgba8();
+        let resized = DynamicImage::ImageRgba8(rgba).resize_exact(
+            target_size * 2,
+            target_size * 2,
+            FilterType::Triangle,
+        );
+
+        // Optional: tiny unsharp mask to restore crispness
+
+        let sharpened: DynamicImage = resized
+            .unsharpen(5.0, 0)
+            .unsharpen(3.0, 0)
+            .unsharpen(2.0, 0);
+
+        sharpened.save(output_path)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 pub fn get_icon_desktop_fallback(
@@ -153,8 +185,8 @@ impl SerializableState {
                 }
 
                 if icon_path.is_empty() {
-                    icon_path =
-                        get_icon_desktop_fallback(icon_name, &*icon_theme, *icon_size).unwrap_or_default();
+                    icon_path = get_icon_desktop_fallback(icon_name, &*icon_theme, *icon_size)
+                        .unwrap_or_default();
                 }
 
                 if icon_path.is_empty() {
@@ -167,11 +199,35 @@ impl SerializableState {
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
                 }
 
-                set_path(
-                    icon_cache,
-                    win.app_id.as_deref().unwrap_or("application-default-icon"),
-                    &icon_path,
+                let mut cache_folder = get_cache_folder();
+                cache_folder.push("icons/");
+                fs::create_dir_all(&cache_folder).unwrap();
+                let filename = Path::new(&icon_path)
+                    .file_name()
+                    .ok_or("Invalid icon path")
+                    .unwrap();
+                let mut output_path = PathBuf::from(cache_folder);
+                output_path.push(filename);
+
+                let resised = resize_icon_if_needed(
+                    Path::new(&icon_path.clone()),
+                    (*icon_size).into(),
+                    &output_path,
                 );
+
+                if resised.unwrap_or_default() {
+                    set_path(
+                        icon_cache,
+                        win.app_id.as_deref().unwrap_or("application-default-icon"),
+                        &output_path.to_string_lossy().to_string(),
+                    );
+                } else {
+                    set_path(
+                        icon_cache,
+                        win.app_id.as_deref().unwrap_or("application-default-icon"),
+                        &icon_path,
+                    );
+                }
 
                 cache_changed = true;
             }

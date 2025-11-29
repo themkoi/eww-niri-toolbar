@@ -9,9 +9,14 @@ pub struct CacheDate {
 
 pub type CacheMap = HashMap<String, CacheDate>;
 
-pub fn get_cache_file() -> PathBuf {
+pub fn get_cache_folder() -> PathBuf {
     let mut path = cache_dir().unwrap();
     path.push("eww-niri-toolbar");
+    path
+}
+
+pub fn get_cache_file() -> PathBuf {
+    let mut path = get_cache_folder();
     fs::create_dir_all(&path).unwrap();
     path.push("cache.toml");
     path
