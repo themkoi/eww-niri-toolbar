@@ -189,6 +189,7 @@ impl SerializableState {
                 }
 
                 let mut cache_folder = get_cache_folder();
+                debug!("cache folder {}",cache_folder.to_string_lossy().to_string());
                 cache_folder.push("icons/");
                 fs::create_dir_all(&cache_folder).unwrap();
                 let filename = Path::new(&icon_path)
