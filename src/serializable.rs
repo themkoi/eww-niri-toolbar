@@ -5,7 +5,6 @@ use crate::cache::*;
 use crate::{config::SortingMode, State};
 use freedesktop_desktop_entry::{default_paths, get_languages_from_env, DesktopEntry, Iter};
 use freedesktop_icons::lookup;
-use icon::Icons;
 use image::imageops::FilterType;
 use image::{DynamicImage, GenericImageView, RgbaImage};
 use log::debug;
@@ -75,18 +74,11 @@ pub fn get_icon_desktop_fallback(
                 if name == app_name {
                     // Try to get the icon from the .desktop file
                     let icon_name = entry.icon().unwrap_or_default();
-                    let mut icon_p = lookup(icon_name)
+                    let icon_p = lookup(icon_name)
                         .with_theme(icon_theme)
                         .with_size(icon_size)
                         .with_cache()
                         .find();
-
-                    if icon_p.is_none() {
-                        let icons = Icons::new();
-                        icons.find_standalone_icon(icon_name).map(|icon| {
-                            icon_p = Some(icon.path().to_path_buf());
-                        });
-                    }
 
                     if let Some(icon_path) = icon_p {
                         return Some(icon_path.to_string_lossy().to_string());
@@ -176,13 +168,6 @@ impl SerializableState {
                         .find();
 
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-                }
-
-                if icon_path.is_empty() {
-                    let icons = Icons::new();
-                    icons.find_standalone_icon(icon_name).map(|icon| {
-                        icon_path = icon.path().to_string_lossy().to_string();
-                    });
                 }
 
                 if icon_path.is_empty() {
