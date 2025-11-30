@@ -98,6 +98,8 @@ impl State {
             Event::WindowUrgencyChanged { .. } => { /* Do nothing */ }
             Event::OverviewOpenedOrClosed { .. } => { /* Do nothing */ }
             Event::ConfigLoaded { .. } => { /* Do nothing */ }
+            Event::WindowFocusTimestampChanged { .. } => { /* Do nothing */ }
+            Event::ScreenshotCaptured { .. } => { /* Do nothing */ }
         }
     }
 }
