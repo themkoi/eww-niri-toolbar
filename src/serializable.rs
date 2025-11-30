@@ -187,28 +187,35 @@ impl SerializableState {
 
                     icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
                 }
+                let mut resised = false;
+                let output_path = "";
+                if !icon_path.is_empty() {
+                    let mut cache_folder = get_cache_folder();
+                    debug!(
+                        "cache folder {}",
+                        cache_folder.to_string_lossy().to_string()
+                    );
+                    cache_folder.push("icons/");
+                    fs::create_dir_all(&cache_folder).unwrap();
+                    let filename = Path::new(&icon_path)
+                        .file_name()
+                        .ok_or_else(|| format!("Invalid icon path: {}", icon_path))
+                        .unwrap();
+                    let mut output_path = PathBuf::from(cache_folder);
+                    output_path.push(filename);
 
-                let mut cache_folder = get_cache_folder();
-                debug!("cache folder {}",cache_folder.to_string_lossy().to_string());
-                cache_folder.push("icons/");
-                fs::create_dir_all(&cache_folder).unwrap();
-                let filename = Path::new(&icon_path)
-                    .file_name()
-                    .ok_or_else(|| format!("Invalid icon path: {}", icon_path)).unwrap();
-                let mut output_path = PathBuf::from(cache_folder);
-                output_path.push(filename);
+                    resised = resize_icon_if_needed(
+                        Path::new(&icon_path.clone()),
+                        (*icon_size).into(),
+                        &output_path,
+                    ).unwrap_or_default();
+                }
 
-                let resised = resize_icon_if_needed(
-                    Path::new(&icon_path.clone()),
-                    (*icon_size).into(),
-                    &output_path,
-                );
-
-                if resised.unwrap_or_default() {
+                if resised{
                     set_path(
                         icon_cache,
                         win.app_id.as_deref().unwrap_or("application-default-icon"),
-                        &output_path.to_string_lossy().to_string(),
+                        &output_path,
                     );
                 } else {
                     set_path(
