@@ -36,7 +36,10 @@ fn resize_icon_if_needed(
 ) -> Result<bool, Box<dyn std::error::Error>> {
     let img = image::open(input_icon)?;
     let (width, height) = img.dimensions();
-    debug!("resizing image: {}", input_icon.to_string_lossy().to_string());
+    debug!(
+        "resizing image: {}",
+        input_icon.to_string_lossy().to_string()
+    );
 
     if width != target_size || height != target_size {
         let rgba: RgbaImage = img.to_rgba8();
@@ -112,7 +115,7 @@ impl SerializableState {
                 icon_cache.get(win.app_id.as_deref().unwrap_or("application-default-icon"))
             {
                 icon_path = cache_date.icon_path.clone();
-                debug!("got icon from cache: {}",icon_path);
+                debug!("got icon from cache: {}", icon_path);
 
                 if *check_cache_validity && Path::new(&cache_date.icon_path).exists() {
                     run_lookup = false; // cache is valid, no need to run lookup
@@ -190,8 +193,7 @@ impl SerializableState {
                 fs::create_dir_all(&cache_folder).unwrap();
                 let filename = Path::new(&icon_path)
                     .file_name()
-                    .ok_or("Invalid icon path")
-                    .unwrap();
+                    .ok_or_else(|| format!("Invalid icon path: {}", icon_path)).unwrap();
                 let mut output_path = PathBuf::from(cache_folder);
                 output_path.push(filename);
 
