@@ -1,3 +1,4 @@
+use log::debug;
 use niri_ipc::{socket::Socket, Event, Request, Response, Window};
 
 mod serializable;
@@ -31,19 +32,14 @@ fn main() {
                 &config.general.seperate_workspaces,
                 &config.general.sorting_mode,
                 &mut history,
-                &config.general.check_cache_validity
+                &config.general.check_cache_validity,
             );
 
-            if !serializable_state.workspaces.is_empty() {
-                let json = serde_json::to_string(&serializable_state).unwrap();
-                println!("{}", json);
-            }
+            let json = serde_json::to_string(&serializable_state).unwrap();
+            println!("{}", json);
         }
     }
 }
-
-
-
 
 #[derive(Debug, Default)]
 struct State {
@@ -78,6 +74,7 @@ impl State {
                 }
             }
             Event::WindowClosed { id } => {
+                debug!("removing window (closed) {}", id);
                 self.windows.retain(|w| w.id != id);
             }
             Event::WindowFocusChanged { id } => {
