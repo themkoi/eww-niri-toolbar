@@ -1,5 +1,3 @@
-use std::default;
-
 use log::debug;
 use niri_ipc::{socket::Socket, Event, Request, Response, Window};
 
