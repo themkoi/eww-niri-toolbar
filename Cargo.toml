@@ -4,8 +4,7 @@ version = "0.2.0"
 edition = "2021"
 
 [dependencies]
-#niri-ipc = { git = "https://github.com/YaLTeR/niri", tag = "v25.05.1" }
-niri-ipc = { git = "https://github.com/YaLTeR/niri", tag = "v25.11" }
+niri-ipc = { path = "../niri/niri-ipc/" }
 eyre = "0.6"
 freedesktop-icons = "0.3.1"
 freedesktop-desktop-entry = "=0.7.11"
