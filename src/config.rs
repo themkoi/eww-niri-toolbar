@@ -1,8 +1,11 @@
-use config::{Config as ConfigLoader, File};
-use dirs::config_dir;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::{Path, PathBuf};
+#[cfg(feature = "config_file")]
+use {
+    config::{Config as ConfigLoader, File},
+    dirs::config_dir,
+    std::fs,
+    std::path::{Path, PathBuf},
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum SortingMode {
@@ -18,6 +21,7 @@ pub struct GeneralConfig {
     pub seperate_workspaces: bool,
     pub sorting_mode: SortingMode,
     pub check_cache_validity: bool,
+    pub blacklist: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -33,10 +37,15 @@ fn default_config() -> Config {
             seperate_workspaces: true,
             sorting_mode: SortingMode::Default,
             check_cache_validity: true,
-        }
+            blacklist: vec!["cosmic-wanderer"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+        },
     }
 }
 
+#[cfg(feature = "config_file")]
 fn get_config_file() -> PathBuf {
     let mut path = config_dir().unwrap();
     path.push("eww-niri-toolbar");
@@ -45,11 +54,13 @@ fn get_config_file() -> PathBuf {
     path
 }
 
+#[cfg(feature = "config_file")]
 fn write_config<P: AsRef<Path>>(path: P, config: &Config) -> std::io::Result<()> {
     let toml_string = toml::to_string_pretty(config).expect("Failed to serialize config");
     fs::write(path, toml_string)
 }
 
+#[cfg(feature = "config_file")]
 pub fn load_or_create_config() -> Config {
     let path = get_config_file();
 
@@ -79,3 +90,9 @@ pub fn load_or_create_config() -> Config {
         }
     }
 }
+
+#[cfg(not(feature = "config_file"))]
+pub fn load_or_create_config() -> Config {
+    default_config()
+}
+

@@ -1,6 +1,8 @@
 use log::debug;
 use niri_ipc::{socket::Socket, Event, Request, Response, Window};
 
+use crate::config::Config;
+
 mod serializable;
 
 mod config;
@@ -24,7 +26,7 @@ fn main() {
         let mut read_event = socket.read_events();
 
         while let Ok(event) = read_event() {
-            state.update_with_event(event);
+            state.update_with_event(event, &config);
             let serializable_state = serializable::SerializableState::from_parts(
                 &state,
                 &config.general.icon_size,
@@ -52,7 +54,7 @@ impl State {
     }
 
     /// https://yalter.github.io/niri/niri_ipc/enum.Event.html
-    fn update_with_event(&mut self, e: Event) {
+    fn update_with_event(&mut self, e: Event, config: &Config) {
         match e {
             Event::WorkspacesChanged { .. } => {}
             Event::WorkspaceActivated { .. } => {}
@@ -63,6 +65,12 @@ impl State {
                     // All other windows become not focused
                     for window in self.windows.iter_mut() {
                         window.is_focused = false;
+                    }
+                }
+
+                if let Some(app_id) = window.app_id.as_ref() {
+                    if config.general.blacklist.contains(app_id) {
+                        return;
                     }
                 }
 
