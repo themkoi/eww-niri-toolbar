@@ -1008,7 +1008,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 [[package]]
 name = "niri-ipc"
 version = "25.11.0"
-source = "git+https://github.com/YaLTeR/niri#f30db163b5748e8cf95c05aba77d0d3736f40543"
+source = "git+https://github.com/YaLTeR/niri?tag=v25.11#b35bcae35b3f9665043c335e55ed5828af77db85"
 dependencies = [
  "serde",
  "serde_json",
