@@ -56,9 +56,6 @@ impl State {
     /// https://yalter.github.io/niri/niri_ipc/enum.Event.html
     fn update_with_event(&mut self, e: Event, config: &Config) {
         match e {
-            Event::WorkspacesChanged { .. } => {}
-            Event::WorkspaceActivated { .. } => {}
-            Event::WorkspaceActiveWindowChanged { .. } => {}
             Event::WindowsChanged { windows } => self.windows = windows,
             Event::WindowOpenedOrChanged { window } => {
                 if window.is_focused {
@@ -96,15 +93,7 @@ impl State {
                     }
                 }
             }
-            Event::WindowLayoutsChanged { .. } => {}
-            Event::KeyboardLayoutsChanged { .. } => { /* Do nothing */ }
-            Event::KeyboardLayoutSwitched { .. } => { /* Do nothing */ }
-            Event::WorkspaceUrgencyChanged { .. } => { /* Do nothing */ }
-            Event::WindowUrgencyChanged { .. } => { /* Do nothing */ }
-            Event::OverviewOpenedOrClosed { .. } => { /* Do nothing */ }
-            Event::ConfigLoaded { .. } => { /* Do nothing */ }
-            Event::WindowFocusTimestampChanged { .. } => { /* Do nothing */ }
-            Event::ScreenshotCaptured { .. } => { /* Do nothing */ }
+            _ => {}
         }
     }
 }
