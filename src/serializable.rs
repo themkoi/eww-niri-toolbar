@@ -64,27 +64,41 @@ fn resize_icon_if_needed(
 }
 
 pub fn get_icon_desktop_fallback(
-    app_name: &str,
+    app_id: &str,
     icon_theme: &str,
     icon_size: u16,
 ) -> Option<String> {
     let locales = get_languages_from_env();
     let paths = Iter::new(default_paths());
-    debug!(" searching through files");
-    for path in paths {
-        if let Ok(entry) = DesktopEntry::from_path(path, Some(&locales)) {
-            if let Some(name) = entry.name(&locales) {
-                if name == app_name {
-                    // Try to get the icon from the .desktop file
-                    let icon_name = entry.icon().unwrap_or_default();
-                    let icon_p = lookup(icon_name)
-                        .with_theme(icon_theme)
-                        .with_size(icon_size)
-                        .with_cache()
-                        .find();
 
-                    if let Some(icon_path) = icon_p {
-                        return Some(icon_path.to_string_lossy().to_string());
+    let app_id_lower = app_id.to_lowercase();
+
+    for path in paths {
+        if let Ok(entry) = DesktopEntry::from_path(path.clone(), Some(&locales)) {
+            // 1. Match by desktop file name
+            if let Some(filename) = path.file_stem() {
+                if filename.to_string_lossy().to_lowercase() == app_id_lower {
+                    if let Some(icon_name) = entry.icon() {
+                        return lookup(icon_name)
+                            .with_theme(icon_theme)
+                            .with_size(icon_size)
+                            .with_cache()
+                            .find()
+                            .map(|p| p.to_string_lossy().to_string());
+                    }
+                }
+            }
+
+            // 2. Match StartupWMClass (VERY important for Wayland/X11)
+            if let Some(wm_class) = entry.startup_wm_class() {
+                if wm_class.to_lowercase() == app_id_lower {
+                    if let Some(icon_name) = entry.icon() {
+                        return lookup(icon_name)
+                            .with_theme(icon_theme)
+                            .with_size(icon_size)
+                            .with_cache()
+                            .find()
+                            .map(|p| p.to_string_lossy().to_string());
                     }
                 }
             }
