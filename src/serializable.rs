@@ -63,11 +63,7 @@ fn resize_icon_if_needed(
     }
 }
 
-pub fn get_icon_desktop_fallback(
-    app_id: &str,
-    icon_theme: &str,
-    icon_size: u16,
-) -> Option<String> {
+pub fn get_icon_desktop_fallback(app_id: &str, icon_theme: &str, icon_size: u16) -> Option<String> {
     let locales = get_languages_from_env();
     let paths = Iter::new(default_paths());
 
@@ -75,7 +71,6 @@ pub fn get_icon_desktop_fallback(
 
     for path in paths {
         if let Ok(entry) = DesktopEntry::from_path(path.clone(), Some(&locales)) {
-            // 1. Match by desktop file name
             if let Some(filename) = path.file_stem() {
                 if filename.to_string_lossy().to_lowercase() == app_id_lower {
                     if let Some(icon_name) = entry.icon() {
@@ -89,7 +84,6 @@ pub fn get_icon_desktop_fallback(
                 }
             }
 
-            // 2. Match StartupWMClass (VERY important for Wayland/X11)
             if let Some(wm_class) = entry.startup_wm_class() {
                 if wm_class.to_lowercase() == app_id_lower {
                     if let Some(icon_name) = entry.icon() {
@@ -99,6 +93,27 @@ pub fn get_icon_desktop_fallback(
                             .with_cache()
                             .find()
                             .map(|p| p.to_string_lossy().to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    let paths = Iter::new(default_paths());
+    for path in paths {
+        if let Ok(entry) = DesktopEntry::from_path(path, Some(&locales)) {
+            if let Some(name) = entry.name(&locales) {
+                if name == app_id {
+                    // Try to get the icon from the .desktop file
+                    let icon_name = entry.icon().unwrap_or_default();
+                    let icon_p = lookup(icon_name)
+                        .with_theme(icon_theme)
+                        .with_size(icon_size)
+                        .with_cache()
+                        .find();
+
+                    if let Some(icon_path) = icon_p {
+                        return Some(icon_path.to_string_lossy().to_string());
                     }
                 }
             }
@@ -222,10 +237,11 @@ impl SerializableState {
                         Path::new(&icon_path.clone()),
                         (*icon_size).into(),
                         &output_path,
-                    ).unwrap_or_default();
+                    )
+                    .unwrap_or_default();
                 }
 
-                if resised{
+                if resised {
                     set_path(
                         icon_cache,
                         win.app_id.as_deref().unwrap_or("application-default-icon"),
