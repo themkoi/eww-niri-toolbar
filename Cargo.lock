@@ -533,6 +533,8 @@ dependencies = [
  "image",
  "log",
  "niri-ipc",
+ "once_cell",
+ "rayon",
  "serde",
  "serde_json",
  "toml 0.8.2",
@@ -1008,7 +1010,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 [[package]]
 name = "niri-ipc"
 version = "25.11.0"
-source = "git+https://github.com/YaLTeR/niri?tag=v25.11#b35bcae35b3f9665043c335e55ed5828af77db85"
+source = "git+https://github.com/YaLTeR/niri?rev=a2a52911757cb3b497db9407592f9b4c439571ea#a2a52911757cb3b497db9407592f9b4c439571ea"
 dependencies = [
  "serde",
  "serde_json",

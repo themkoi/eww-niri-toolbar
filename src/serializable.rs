@@ -1,14 +1,18 @@
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path},
+};
 
 use crate::cache::*;
 use crate::{config::SortingMode, State};
+
 use freedesktop_desktop_entry::{default_paths, get_languages_from_env, DesktopEntry, Iter};
 use freedesktop_icons::lookup;
-use image::imageops::FilterType;
-use image::{DynamicImage, GenericImageView, RgbaImage};
-use log::debug;
+
 use serde::Serialize;
+use once_cell::sync::Lazy;
+use rayon::prelude::*;
 
 #[derive(Serialize)]
 pub(crate) struct SerializableState {
@@ -29,98 +33,41 @@ struct Window {
     icon_path: String,
     is_focused: bool,
 }
-fn resize_icon_if_needed(
-    input_icon: &Path,
-    target_size: u32,
-    output_path: &Path,
-) -> Result<bool, Box<dyn std::error::Error>> {
-    let img = image::open(input_icon)?;
-    let (width, height) = img.dimensions();
-    debug!(
-        "resizing image: {}",
-        input_icon.to_string_lossy().to_string()
-    );
 
-    if width != target_size || height != target_size {
-        let rgba: RgbaImage = img.to_rgba8();
-        let resized = DynamicImage::ImageRgba8(rgba).resize_exact(
-            target_size * 2,
-            target_size * 2,
-            FilterType::Triangle,
-        );
-
-        // Optional: tiny unsharp mask to restore crispness
-
-        let sharpened: DynamicImage = resized
-            .unsharpen(5.0, 0)
-            .unsharpen(3.0, 0)
-            .unsharpen(2.0, 0);
-
-        sharpened.save(output_path)?;
-        Ok(true)
-    } else {
-        Ok(false)
-    }
-}
-
-pub fn get_icon_desktop_fallback(app_id: &str, icon_theme: &str, icon_size: u16) -> Option<String> {
+static DESKTOP_ICON_INDEX: Lazy<HashMap<String, String>> = Lazy::new(|| {
     let locales = get_languages_from_env();
-    let paths = Iter::new(default_paths());
+    let mut map = HashMap::new();
 
-    let app_id_lower = app_id.to_lowercase();
-
-    for path in paths {
+    for path in Iter::new(default_paths()) {
         if let Ok(entry) = DesktopEntry::from_path(path.clone(), Some(&locales)) {
-            if let Some(filename) = path.file_stem() {
-                if filename.to_string_lossy().to_lowercase() == app_id_lower {
-                    if let Some(icon_name) = entry.icon() {
-                        return lookup(icon_name)
-                            .with_theme(icon_theme)
-                            .with_size(icon_size)
-                            .with_cache()
-                            .find()
-                            .map(|p| p.to_string_lossy().to_string());
-                    }
+            if let Some(icon) = entry.icon() {
+                if let Some(stem) = path.file_stem() {
+                    map.insert(stem.to_string_lossy().to_lowercase(), icon.to_string());
                 }
-            }
 
-            if let Some(wm_class) = entry.startup_wm_class() {
-                if wm_class.to_lowercase() == app_id_lower {
-                    if let Some(icon_name) = entry.icon() {
-                        return lookup(icon_name)
-                            .with_theme(icon_theme)
-                            .with_size(icon_size)
-                            .with_cache()
-                            .find()
-                            .map(|p| p.to_string_lossy().to_string());
-                    }
+                if let Some(wm) = entry.startup_wm_class() {
+                    map.insert(wm.to_lowercase(), icon.to_string());
                 }
             }
         }
     }
 
-    let paths = Iter::new(default_paths());
-    for path in paths {
-        if let Ok(entry) = DesktopEntry::from_path(path, Some(&locales)) {
-            if let Some(name) = entry.name(&locales) {
-                if name == app_id {
-                    // Try to get the icon from the .desktop file
-                    let icon_name = entry.icon().unwrap_or_default();
-                    let icon_p = lookup(icon_name)
-                        .with_theme(icon_theme)
-                        .with_size(icon_size)
-                        .with_cache()
-                        .find();
+    map
+});
 
-                    if let Some(icon_path) = icon_p {
-                        return Some(icon_path.to_string_lossy().to_string());
-                    }
-                }
-            }
-        }
-    }
+pub fn get_icon_desktop_fallback(
+    app_id: &str,
+    icon_theme: &str,
+    icon_size: u16,
+) -> Option<String> {
+    let icon_name = DESKTOP_ICON_INDEX.get(&app_id.to_lowercase())?;
 
-    None
+    lookup(icon_name)
+        .with_theme(icon_theme)
+        .with_size(icon_size)
+        .with_cache()
+        .find()
+        .map(|p| p.to_string_lossy().into_owned())
 }
 
 impl SerializableState {
@@ -128,145 +75,114 @@ impl SerializableState {
         state: &State,
         icon_size: &u16,
         icon_theme: &String,
-        seperate_workspaces: &bool,
+        separate_workspaces: &bool,
         sorting_mode: &SortingMode,
         icon_cache: &mut CacheMap,
         check_cache_validity: &bool,
     ) -> Self {
-        let mut workspaces_map = std::collections::BTreeMap::<u64, Workspace>::new();
         let mut cache_changed = false;
-        for win in &state.windows {
-            let icon_name = win.app_id.as_deref().unwrap_or("application-default-icon");
-            let mut icon_path = String::new();
-            let mut run_lookup = true;
 
-            if let Some(cache_date) =
-                icon_cache.get(win.app_id.as_deref().unwrap_or("application-default-icon"))
-            {
-                icon_path = cache_date.icon_path.clone();
-                debug!("got icon from cache: {}", icon_path);
+        /* per-run dedup cache */
+        let mut resolved: HashMap<String, String> = HashMap::new();
 
-                if *check_cache_validity && Path::new(&cache_date.icon_path).exists() {
-                    run_lookup = false; // cache is valid, no need to run lookup
-                }
-            }
+        /* cache dir (ONLY ONCE) */
+        let mut cache_folder = get_cache_folder();
+        cache_folder.push("icons");
+        fs::create_dir_all(&cache_folder).ok();
 
-            if run_lookup {
-                debug!("running lookup for {}", icon_name);
-                let mut icon = lookup(icon_name)
-                    .with_cache()
-                    .with_size(*icon_size)
-                    .with_theme(&icon_theme)
-                    .find();
+        let unique_apps: Vec<String> = state
+            .windows
+            .iter()
+            .map(|w| w.app_id.clone().unwrap_or_else(|| "application-default-icon".into()))
+            .collect();
 
-                icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-                let lowercase_icon_name = icon_name.to_lowercase();
+        let results: Vec<(String, String)> = unique_apps
+            .into_par_iter()
+            .map(|app_id| {
+                let key = app_id.clone();
+                let mut icon_path = String::new();
+                let mut run_lookup = true;
 
-                if icon_path.is_empty() {
-                    icon = lookup(&lowercase_icon_name)
-                        .with_size(*icon_size)
-                        .with_cache()
-                        .with_theme(&icon_theme)
-                        .find();
+                if let Some(cache) = icon_cache.get(&key) {
+                    icon_path = cache.icon_path.clone();
 
-                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                    if *check_cache_validity && Path::new(&icon_path).exists() {
+                        run_lookup = false;
+                    }
                 }
 
-                if icon_path.is_empty() {
-                    let icon_name = lowercase_icon_name
-                        .rsplit('.')
-                        .next()
-                        .unwrap_or("application-default-icon");
-
-                    icon = lookup(icon_name)
+                if run_lookup {
+                    let mut icon = lookup(&key)
                         .with_cache()
                         .with_size(*icon_size)
-                        .with_theme(&icon_theme)
+                        .with_theme(icon_theme)
                         .find();
 
-                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
+                    icon_path = icon
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .into_owned();
+
+                    if icon_path.is_empty() {
+                        let lower = key.to_lowercase();
+
+                        icon = lookup(&lower)
+                            .with_cache()
+                            .with_size(*icon_size)
+                            .with_theme(icon_theme)
+                            .find();
+
+                        icon_path = icon.unwrap_or_default().to_string_lossy().into_owned();
+                    }
+
+                    if icon_path.is_empty() {
+                        icon_path = get_icon_desktop_fallback(&key, icon_theme, *icon_size)
+                            .unwrap_or_default();
+                    }
+
+                    if icon_path.is_empty() {
+                        icon = lookup("application-x-executable")
+                            .with_cache()
+                            .with_size(*icon_size)
+                            .with_theme(icon_theme)
+                            .find();
+
+                        icon_path = icon.unwrap_or_default().to_string_lossy().into_owned();
+                    }
                 }
 
-                if icon_path.is_empty() {
-                    let icon_name = lowercase_icon_name
-                        .split('*')
-                        .next()
-                        .unwrap_or("application-default-icon");
+                (key, icon_path)
+            })
+            .collect();
 
-                    icon = lookup(icon_name)
-                        .with_size(*icon_size)
-                        .with_cache()
-                        .with_theme(&icon_theme)
-                        .find();
-
-                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-                }
-
-                if icon_path.is_empty() {
-                    icon_path = get_icon_desktop_fallback(icon_name, &*icon_theme, *icon_size)
-                        .unwrap_or_default();
-                }
-
-                if icon_path.is_empty() {
-                    icon = lookup("application-x-executable")
-                        .with_size(*icon_size)
-                        .with_cache()
-                        .with_theme(&icon_theme)
-                        .find();
-
-                    icon_path = icon.unwrap_or_default().to_string_lossy().to_string();
-                }
-                let mut resised = false;
-                let output_path = "";
-                if !icon_path.is_empty() {
-                    let mut cache_folder = get_cache_folder();
-                    debug!(
-                        "cache folder {}",
-                        cache_folder.to_string_lossy().to_string()
-                    );
-                    cache_folder.push("icons/");
-                    fs::create_dir_all(&cache_folder).unwrap();
-                    let filename = Path::new(&icon_path)
-                        .file_name()
-                        .ok_or_else(|| format!("Invalid icon path: {}", icon_path))
-                        .unwrap();
-                    let mut output_path = PathBuf::from(cache_folder);
-                    output_path.push(filename);
-
-                    resised = resize_icon_if_needed(
-                        Path::new(&icon_path.clone()),
-                        (*icon_size).into(),
-                        &output_path,
-                    )
-                    .unwrap_or_default();
-                }
-
-                if resised {
-                    set_path(
-                        icon_cache,
-                        win.app_id.as_deref().unwrap_or("application-default-icon"),
-                        &output_path,
-                    );
-                } else {
-                    set_path(
-                        icon_cache,
-                        win.app_id.as_deref().unwrap_or("application-default-icon"),
-                        &icon_path,
-                    );
-                }
-
+        for (key, path) in &results {
+            if !path.is_empty() {
+                set_path(icon_cache, key, path);
                 cache_changed = true;
             }
+            resolved.insert(key.clone(), path.clone());
+        }
+
+
+        let mut workspaces_map = std::collections::BTreeMap::<u64, Workspace>::new();
+
+        for win in &state.windows {
+            let key = win
+                .app_id
+                .clone()
+                .unwrap_or_else(|| "application-default-icon".into());
+
+            let icon_path = resolved.get(&key).cloned().unwrap_or_default();
 
             let window = Window {
                 id: win.id,
-                app_id: win.app_id.clone().unwrap_or_else(|| "unknown".to_string()),
+                app_id: key.clone(),
                 title: win.title.clone().unwrap_or_default(),
                 icon_path,
                 is_focused: win.is_focused,
             };
 
-            let ws_id = if *seperate_workspaces {
+            let ws_id = if *separate_workspaces {
                 win.workspace_id.unwrap_or(0)
             } else {
                 0
@@ -282,8 +198,9 @@ impl SerializableState {
                 .push(window);
         }
 
+
         let mut workspaces: Vec<Workspace> = workspaces_map.into_values().collect();
-        workspaces.sort_by_key(|ws| ws.id); // always sort workspaces by id
+        workspaces.sort_by_key(|ws| ws.id);
 
         for ws in &mut workspaces {
             match sorting_mode {
@@ -292,9 +209,11 @@ impl SerializableState {
                 SortingMode::Id => ws.windows.sort_by_key(|w| w.id),
             }
         }
+
         if cache_changed {
-            save_cache(&icon_cache);
+            save_cache(icon_cache);
         }
+
         SerializableState { workspaces }
     }
 }
