@@ -22,6 +22,7 @@ pub struct GeneralConfig {
     pub sorting_mode: SortingMode,
     pub check_cache_validity: bool,
     pub blacklist: Vec<String>,
+    pub socket_path: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -41,6 +42,7 @@ fn default_config() -> Config {
                 .into_iter()
                 .map(String::from)
                 .collect(),
+            socket_path: "/tmp/niri-taskbar.sock".to_string(),
         },
     }
 }
@@ -95,4 +97,3 @@ pub fn load_or_create_config() -> Config {
 pub fn load_or_create_config() -> Config {
     default_config()
 }
-

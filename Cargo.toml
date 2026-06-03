@@ -1,5 +1,5 @@
 [package]
-name = "eww-niri-taskbar"
+name = "quickshell-niri-taskbar"
 version = "0.2.0"
 edition = "2021"
 

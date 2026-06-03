@@ -521,26 +521,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eww-niri-taskbar"
-version = "0.2.0"
-dependencies = [
- "config",
- "dirs",
- "env_logger",
- "eyre",
- "freedesktop-desktop-entry",
- "freedesktop-icons",
- "image",
- "log",
- "niri-ipc",
- "once_cell",
- "rayon",
- "serde",
- "serde_json",
- "toml 0.8.2",
-]
-
-[[package]]
 name = "exr"
 version = "1.74.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1294,6 +1274,26 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
+
+[[package]]
+name = "quickshell-niri-taskbar"
+version = "0.2.0"
+dependencies = [
+ "config",
+ "dirs",
+ "env_logger",
+ "eyre",
+ "freedesktop-desktop-entry",
+ "freedesktop-icons",
+ "image",
+ "log",
+ "niri-ipc",
+ "once_cell",
+ "rayon",
+ "serde",
+ "serde_json",
+ "toml 0.8.2",
+]
 
 [[package]]
 name = "quote"
